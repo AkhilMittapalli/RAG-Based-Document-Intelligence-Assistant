@@ -136,7 +136,13 @@ class RagEngine:
 
     def _gemini_request(self, endpoint: str, payload: dict) -> dict:
         url = f"{GEMINI_API_BASE}/{endpoint}?key={self._api_key}"
-        resp = requests.post(url, json=payload, timeout=60)
+        for attempt in range(3):
+            try:
+                resp = requests.post(url, json=payload, timeout=120)
+                break
+            except requests.exceptions.ReadTimeout:
+                if attempt == 2:
+                    raise
         if resp.status_code != 200:
             raise RuntimeError(f"Gemini API {resp.status_code}: {resp.text[:300]}")
         return resp.json()
