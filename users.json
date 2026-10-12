@@ -1,0 +1,52 @@
+{
+  "users": {
+    "admin": {
+      "password": "admin123",
+      "name": "Admin User",
+      "role": "admin",
+      "access": ["*"]
+    },
+    "bid_analyst": {
+      "password": "bid123",
+      "name": "Sarah Chen",
+      "role": "Bid Analyst",
+      "access": [
+        "rfp_*", "bid_*",
+        "ufgs_*",
+        "la_*", "ten_states_*", "ny_dec_*",
+        "wa_ecology_*", "mn_pca_*",
+        "clarifier_*", "kasco_*", "monroe_*"
+      ]
+    },
+    "field_tech": {
+      "password": "field123",
+      "name": "Mike Rivera",
+      "role": "Field Technician",
+      "access": [
+        "*_om_*",
+        "oregon_deq_*",
+        "uss_midwest_*", "pakistan_wwtp_*",
+        "epa_control_panels*",
+        "epa_uv_disinfection*",
+        "epa_chlorine_disinfection*",
+        "epa_package_plants*",
+        "epa_oxidation_ditch*",
+        "epa_sequencing_batch_reactors*",
+        "epa_membrane_bioreactors*"
+      ]
+    },
+    "pfas_engineer": {
+      "password": "pfas123",
+      "name": "Dr. Lisa Park",
+      "role": "PFAS Sales Engineer",
+      "access": [
+        "epa_pfas_*",
+        "epa_granular_activated_carbon*",
+        "uschamber_pfas_*",
+        "epa_advanced_ww_treatment*",
+        "epa_innovative_nutrient_removal*",
+        "epa_membrane_bioreactors*"
+      ]
+    }
+  }
+}

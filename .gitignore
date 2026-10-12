@@ -1,0 +1,18 @@
+# Environment
+.env
+__pycache__/
+*.pyc
+
+# Local data (source PDFs, not needed at runtime)
+data/
+
+# Local ChromaDB (too large; cloud uses db_export/)
+chroma_db/
+
+# Dev/debug scripts
+recover_uv_images.py
+debug_query.py
+export_db.py
+
+# Vision eval (not needed at runtime)
+eval_vision.json
