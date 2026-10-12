@@ -96,7 +96,7 @@ class RagEngine:
             raise ValueError("GEMINI_API_KEY not set — add it to .streamlit/secrets.toml or .env")
         self._api_key = api_key
         self._embed_model = "gemini-embedding-001"
-        self._gen_model = "gemini-3.8-flash"
+        self._gen_model = "gemini-2.0-flash"
 
         chroma_exists = Path(persist_dir).exists() and (Path(persist_dir) / "chroma.sqlite3").exists()
         export_exists = Path(export_dir).exists() and (Path(export_dir) / "data.json").exists()
@@ -139,10 +139,15 @@ class RagEngine:
         for attempt in range(3):
             try:
                 resp = requests.post(url, json=payload, timeout=120)
-                break
             except requests.exceptions.ReadTimeout:
                 if attempt == 2:
                     raise
+                time.sleep(2 ** attempt)
+                continue
+            if resp.status_code in (429, 500, 502, 503) and attempt < 2:
+                time.sleep(2 ** attempt)
+                continue
+            break
         if resp.status_code != 200:
             raise RuntimeError(f"Gemini API {resp.status_code}: {resp.text[:300]}")
         return resp.json()
