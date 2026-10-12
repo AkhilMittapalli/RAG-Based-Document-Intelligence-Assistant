@@ -13,7 +13,7 @@ load_dotenv()
 # On Streamlit Cloud, load API key from secrets
 try:
     if "GEMINI_API_KEY" in st.secrets:
-        os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+        os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"].strip()
 except FileNotFoundError:
     pass
 
@@ -442,7 +442,10 @@ def format_citation(src: dict) -> str:
 
 @st.cache_resource
 def get_engine():
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if api_key:
+        masked = api_key[:8] + "..." + api_key[-4:]
+        st.sidebar.caption(f"API key: {masked}")
     return RagEngine(persist_dir="./chroma_db", export_dir="./db_export", api_key=api_key)
 
 
