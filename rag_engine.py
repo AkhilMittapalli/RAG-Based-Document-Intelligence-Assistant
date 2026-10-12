@@ -90,7 +90,11 @@ class RagEngine:
             api_key = os.environ.get("GEMINI_API_KEY", "")
         if not api_key:
             raise ValueError("GEMINI_API_KEY not set — add it to .streamlit/secrets.toml or .env")
-        self.client = genai.Client(api_key=api_key)
+        for var in ("GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_GENAI_USE_VERTEXAI"):
+            os.environ.pop(var, None)
+        os.environ["GEMINI_API_KEY"] = api_key
+        os.environ["GOOGLE_API_KEY"] = api_key
+        self.client = genai.Client(api_key=api_key, vertexai=False)
         self._embed_model = "gemini-embedding-001"
 
         chroma_exists = Path(persist_dir).exists() and (Path(persist_dir) / "chroma.sqlite3").exists()
