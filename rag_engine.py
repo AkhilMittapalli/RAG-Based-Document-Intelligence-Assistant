@@ -85,8 +85,11 @@ def chunk_pages(
 
 
 class RagEngine:
-    def __init__(self, persist_dir: str = "./chroma_db", export_dir: str = "./db_export"):
-        api_key = os.environ.get("GEMINI_API_KEY", "")
+    def __init__(self, persist_dir: str = "./chroma_db", export_dir: str = "./db_export", api_key: str = ""):
+        if not api_key:
+            api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not set — add it to .streamlit/secrets.toml or .env")
         self.client = genai.Client(api_key=api_key)
         self._embed_model = "gemini-embedding-001"
 

@@ -442,7 +442,8 @@ def format_citation(src: dict) -> str:
 
 @st.cache_resource
 def get_engine():
-    return RagEngine(persist_dir="./chroma_db", export_dir="./db_export")
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    return RagEngine(persist_dir="./chroma_db", export_dir="./db_export", api_key=api_key)
 
 
 engine = get_engine()
