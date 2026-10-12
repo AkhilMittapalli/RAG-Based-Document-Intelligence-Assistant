@@ -95,14 +95,19 @@ section[data-testid="stSidebar"] .stMarkdown h3 {
     background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important;
     color: white !important;
     border: none !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     font-weight: 600 !important;
-    padding: 0.6rem 2rem !important;
-    transition: all 0.2s ease !important;
+    padding: 0.75rem 2rem !important;
+    font-size: 0.95rem !important;
+    letter-spacing: 0.02em !important;
+    transition: all 0.25s ease !important;
 }
 .stFormSubmitButton > button:hover {
-    box-shadow: 0 4px 20px rgba(14, 165, 233, 0.4) !important;
-    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 25px rgba(14, 165, 233, 0.45) !important;
+    transform: translateY(-2px) !important;
+}
+.stFormSubmitButton > button:active {
+    transform: translateY(0px) !important;
 }
 
 /* ---- Chat messages ---- */
@@ -183,29 +188,42 @@ hr {
 
 /* ---- Login card ---- */
 .login-card {
-    background: var(--surface-raised);
+    background: linear-gradient(180deg, var(--surface-raised) 0%, rgba(22, 34, 49, 0.8) 100%);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 2.5rem;
+    border-radius: 20px;
+    padding: 3rem 2.5rem 2rem;
     margin: 2rem auto;
     max-width: 420px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4), 0 0 40px rgba(14, 165, 233, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #0ea5e9, #38bdf8, transparent);
 }
 .login-header {
     text-align: center;
     margin-bottom: 2rem;
 }
 .login-header h1 {
-    font-size: 1.8rem;
+    font-size: 2.2rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8, #7dd3fc);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.03em;
 }
 .login-header p {
     color: var(--text-secondary);
     font-size: 0.9rem;
+    letter-spacing: 0.02em;
 }
 
 /* ---- Hero / branding ---- */
@@ -327,34 +345,15 @@ hr {
     font-weight: 500;
 }
 
-/* ---- Demo accounts table ---- */
-.demo-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-top: 1rem;
-}
-.demo-table th {
-    text-align: left;
-    padding: 8px 12px;
-    font-size: 0.7rem;
+/* ---- Powered-by footer ---- */
+.powered-by {
+    text-align: center;
     color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border);
-}
-.demo-table td {
-    padding: 8px 12px;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    border-bottom: 1px solid rgba(30, 58, 80, 0.4);
-}
-.demo-table code {
-    background: var(--surface-overlay);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    color: var(--brand-blue);
+    font-size: 0.75rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    letter-spacing: 0.02em;
 }
 
 /* ---- Sidebar user avatar ---- */
@@ -443,9 +442,6 @@ def format_citation(src: dict) -> str:
 @st.cache_resource
 def get_engine():
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if api_key:
-        masked = api_key[:8] + "..." + api_key[-4:]
-        st.sidebar.caption(f"API key: {masked}")
     return RagEngine(persist_dir="./chroma_db", export_dir="./db_export", api_key=api_key)
 
 
@@ -475,7 +471,7 @@ if st.session_state.user is None:
         with st.form("login_form"):
             username = st.text_input("Username", placeholder="Enter your username")
             password = st.text_input("Password", type="password", placeholder="Enter your password")
-            submitted = st.form_submit_button("Sign In")
+            submitted = st.form_submit_button("Sign In", use_container_width=True)
 
         if submitted:
             if username in USERS and USERS[username]["password"] == password:
@@ -485,15 +481,10 @@ if st.session_state.user is None:
             else:
                 st.error("Invalid username or password")
 
-        st.markdown("")
         st.markdown("""
-        <table class="demo-table">
-            <tr><th>Username</th><th>Password</th><th>Role</th></tr>
-            <tr><td><code>admin</code></td><td><code>admin123</code></td><td>Administrator</td></tr>
-            <tr><td><code>bid_analyst</code></td><td><code>bid123</code></td><td>Bid Analyst</td></tr>
-            <tr><td><code>field_tech</code></td><td><code>field123</code></td><td>Field Technician</td></tr>
-            <tr><td><code>pfas_engineer</code></td><td><code>pfas123</code></td><td>PFAS Sales Engineer</td></tr>
-        </table>
+        <div class="powered-by">
+            Powered by RAG &middot; Gemini AI
+        </div>
         """, unsafe_allow_html=True)
     st.stop()
 
