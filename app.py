@@ -11,8 +11,11 @@ from rag_engine import RagEngine, load_users, resolve_access
 load_dotenv()
 
 # On Streamlit Cloud, load API key from secrets
-if "GEMINI_API_KEY" in st.secrets:
-    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+try:
+    if "GEMINI_API_KEY" in st.secrets:
+        os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+except FileNotFoundError:
+    pass
 
 CLOUD_MODE = not Path("./chroma_db/chroma.sqlite3").exists()
 
@@ -729,12 +732,19 @@ if question:
         )
     else:
         with st.chat_message("assistant"):
-            with st.spinner("Searching documents and generating answer..."):
-                result = engine.query(
-                    question,
-                    n_results=n_results,
-                    allowed_sources=user_sources,
+            try:
+                with st.spinner("Searching documents and generating answer..."):
+                    result = engine.query(
+                        question,
+                        n_results=n_results,
+                        allowed_sources=user_sources,
+                    )
+            except Exception as e:
+                st.error(f"Error querying: {type(e).__name__}: {e}")
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": f"Error: {e}"}
                 )
+                st.stop()
 
             if not result["sources"]:
                 st.warning(
