@@ -345,6 +345,44 @@ hr {
     font-weight: 500;
 }
 
+/* ---- Demo accounts table ---- */
+.demo-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 1.5rem;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.demo-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--surface-overlay);
+    border-bottom: 1px solid var(--border);
+}
+.demo-table td {
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(30, 58, 80, 0.3);
+    background: var(--surface-raised);
+}
+.demo-table tr:last-child td {
+    border-bottom: none;
+}
+.demo-table code {
+    background: var(--surface-overlay);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--brand-blue);
+}
+
 /* ---- Powered-by footer ---- */
 .powered-by {
     text-align: center;
@@ -480,6 +518,17 @@ if st.session_state.user is None:
                 st.rerun()
             else:
                 st.error("Invalid username or password")
+
+        st.markdown("")
+        st.markdown("""
+        <table class="demo-table">
+            <tr><th>Username</th><th>Password</th><th>Role</th></tr>
+            <tr><td><code>admin</code></td><td><code>admin123</code></td><td>Administrator</td></tr>
+            <tr><td><code>bid_analyst</code></td><td><code>bid123</code></td><td>Bid Analyst</td></tr>
+            <tr><td><code>field_tech</code></td><td><code>field123</code></td><td>Field Technician</td></tr>
+            <tr><td><code>pfas_engineer</code></td><td><code>pfas123</code></td><td>PFAS Sales Engineer</td></tr>
+        </table>
+        """, unsafe_allow_html=True)
 
         st.markdown("""
         <div class="powered-by">
