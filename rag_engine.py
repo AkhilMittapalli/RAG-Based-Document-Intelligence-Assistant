@@ -6,7 +6,10 @@ import time
 from pathlib import Path
 
 import numpy as np
-import google.generativeai as genai
+import requests
+
+
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 
 def load_users(path: str = None) -> dict:
@@ -89,9 +92,9 @@ class RagEngine:
             api_key = os.environ.get("GEMINI_API_KEY", "")
         if not api_key:
             raise ValueError("GEMINI_API_KEY not set — add it to .streamlit/secrets.toml or .env")
-        genai.configure(api_key=api_key)
-        self._embed_model = "models/gemini-embedding-001"
-        self._gen_model_name = "gemini-3.8-flash"
+        self._api_key = api_key
+        self._embed_model = "gemini-embedding-001"
+        self._gen_model = "gemini-3.8-flash"
 
         chroma_exists = Path(persist_dir).exists() and (Path(persist_dir) / "chroma.sqlite3").exists()
         export_exists = Path(export_dir).exists() and (Path(export_dir) / "data.json").exists()
@@ -129,53 +132,47 @@ class RagEngine:
             return self.collection.count()
         return len(self._np_ids)
 
+    def _gemini_request(self, endpoint: str, payload: dict) -> dict:
+        url = f"{GEMINI_API_BASE}/{endpoint}?key={self._api_key}"
+        resp = requests.post(url, json=payload, timeout=60)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Gemini API {resp.status_code}: {resp.text[:300]}")
+        return resp.json()
+
     def _embed(self, texts: list[str]) -> list[list[float]]:
-        result = genai.embed_content(
-            model=self._embed_model,
-            content=texts,
-            task_type="retrieval_document",
-        )
-        return result["embedding"]
+        results = []
+        for text in texts:
+            data = self._gemini_request(
+                f"models/{self._embed_model}:embedContent",
+                {
+                    "content": {"parts": [{"text": text}]},
+                    "taskType": "RETRIEVAL_DOCUMENT",
+                },
+            )
+            results.append(data["embedding"]["values"])
+        return results
 
     def _embed_query(self, text: str) -> list[float]:
-        result = genai.embed_content(
-            model=self._embed_model,
-            content=text,
-            task_type="retrieval_query",
+        data = self._gemini_request(
+            f"models/{self._embed_model}:embedContent",
+            {
+                "content": {"parts": [{"text": text}]},
+                "taskType": "RETRIEVAL_QUERY",
+            },
         )
-        return result["embedding"]
+        return data["embedding"]["values"]
 
-    def _is_diagram_vision(self, image_bytes: bytes) -> bool:
-        import PIL.Image, io
-        prompt = (
-            "Look at this image extracted from a water/wastewater treatment PDF. "
-            "Classify it as ONE of:\n"
-            "- DIAGRAM: a technical diagram, schematic, process flow, P&ID, cross-section, "
-            "equipment drawing, graph, chart, or data table with visual elements\n"
-            "- JUNK: a solid color block, decorative element, logo, small icon, blank page, "
-            "scanned text-only page, header/footer graphic, or border element\n\n"
-            "Respond with ONLY one word: DIAGRAM or JUNK"
+    def _generate(self, prompt: str, system_instruction: str = "") -> str:
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+        }
+        if system_instruction:
+            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+        data = self._gemini_request(
+            f"models/{self._gen_model}:generateContent",
+            payload,
         )
-        img = PIL.Image.open(io.BytesIO(image_bytes))
-        vision_model = genai.GenerativeModel(self._gen_model_name)
-        response = vision_model.generate_content([prompt, img])
-        return "DIAGRAM" in response.text.strip().upper()
-
-    def _describe_image(self, image_bytes: bytes, mime_type: str, context: str) -> str:
-        import PIL.Image, io
-        prompt = (
-            "Describe this technical diagram/figure from a water or wastewater treatment document. "
-            "Include: what type of diagram it is (process flow, P&ID, schematic, cross-section, graph, table, etc.), "
-            "the equipment or process shown, key components labeled, flow directions, "
-            "and any numerical values or specifications visible. "
-            "Be thorough and technical — this description will be used for document search."
-        )
-        if context:
-            prompt += f"\n\nThis image is from: {context}"
-        img = PIL.Image.open(io.BytesIO(image_bytes))
-        vision_model = genai.GenerativeModel(self._gen_model_name)
-        response = vision_model.generate_content([prompt, img])
-        return response.text
+        return data["candidates"][0]["content"]["parts"][0]["text"]
 
     def ingest(
         self,
@@ -293,8 +290,26 @@ class RagEngine:
                 pix.save(str(img_path))
 
                 image_bytes = img_path.read_bytes()
+                import base64
+                b64 = base64.b64encode(image_bytes).decode()
+                payload = {
+                    "contents": [{"parts": [
+                        {"inlineData": {"mimeType": "image/png", "data": b64}},
+                        {"text": (
+                            "Look at this image extracted from a water/wastewater treatment PDF. "
+                            "Classify it as ONE of:\n"
+                            "- DIAGRAM: a technical diagram, schematic, process flow, P&ID, cross-section, "
+                            "equipment drawing, graph, chart, or data table with visual elements\n"
+                            "- JUNK: a solid color block, decorative element, logo, small icon, blank page, "
+                            "scanned text-only page, header/footer graphic, or border element\n\n"
+                            "Respond with ONLY one word: DIAGRAM or JUNK"
+                        )},
+                    ]}],
+                }
                 try:
-                    if not self._is_diagram_vision(image_bytes):
+                    data = self._gemini_request(f"models/{self._gen_model}:generateContent", payload)
+                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    if "DIAGRAM" not in text.strip().upper():
                         pix = None
                         continue
                 except Exception:
@@ -302,9 +317,22 @@ class RagEngine:
                 time.sleep(0.3)
 
                 try:
-                    description = self._describe_image(
-                        image_bytes, "image/png", filename
+                    desc_prompt = (
+                        "Describe this technical diagram/figure from a water or wastewater treatment document. "
+                        "Include: what type of diagram it is (process flow, P&ID, schematic, cross-section, graph, table, etc.), "
+                        "the equipment or process shown, key components labeled, flow directions, "
+                        "and any numerical values or specifications visible. "
+                        "Be thorough and technical — this description will be used for document search."
+                        f"\n\nThis image is from: {filename}"
                     )
+                    desc_payload = {
+                        "contents": [{"parts": [
+                            {"inlineData": {"mimeType": "image/png", "data": b64}},
+                            {"text": desc_prompt},
+                        ]}],
+                    }
+                    data = self._gemini_request(f"models/{self._gen_model}:generateContent", desc_payload)
+                    description = data["candidates"][0]["content"]["parts"][0]["text"]
                 except Exception as e:
                     print(f"    Vision failed for {img_filename}: {e}")
                     pix = None
@@ -455,16 +483,13 @@ class RagEngine:
             "Use technical water/wastewater treatment terminology appropriately."
         )
 
-        model = genai.GenerativeModel(
-            self._gen_model_name,
-            system_instruction=system_prompt,
-        )
-        response = model.generate_content(
+        answer = self._generate(
             f"Context from documents:\n\n{context}\n\n---\n\nQuestion: {question}",
+            system_instruction=system_prompt,
         )
 
         return {
-            "answer": response.text,
+            "answer": answer,
             "sources": [
                 {
                     "text": doc,
