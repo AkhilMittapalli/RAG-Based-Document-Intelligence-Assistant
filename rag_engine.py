@@ -6,8 +6,7 @@ import time
 from pathlib import Path
 
 import numpy as np
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 
 def load_users(path: str = None) -> dict:
@@ -90,12 +89,9 @@ class RagEngine:
             api_key = os.environ.get("GEMINI_API_KEY", "")
         if not api_key:
             raise ValueError("GEMINI_API_KEY not set — add it to .streamlit/secrets.toml or .env")
-        for var in ("GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_GENAI_USE_VERTEXAI"):
-            os.environ.pop(var, None)
-        os.environ["GEMINI_API_KEY"] = api_key
-        os.environ["GOOGLE_API_KEY"] = api_key
-        self.client = genai.Client(api_key=api_key, vertexai=False)
-        self._embed_model = "gemini-embedding-001"
+        genai.configure(api_key=api_key)
+        self._embed_model = "models/gemini-embedding-001"
+        self._gen_model_name = "gemini-3.8-flash"
 
         chroma_exists = Path(persist_dir).exists() and (Path(persist_dir) / "chroma.sqlite3").exists()
         export_exists = Path(export_dir).exists() and (Path(export_dir) / "data.json").exists()
@@ -134,22 +130,23 @@ class RagEngine:
         return len(self._np_ids)
 
     def _embed(self, texts: list[str]) -> list[list[float]]:
-        result = self.client.models.embed_content(
+        result = genai.embed_content(
             model=self._embed_model,
-            contents=texts,
-            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
+            content=texts,
+            task_type="retrieval_document",
         )
-        return [e.values for e in result.embeddings]
+        return result["embedding"]
 
     def _embed_query(self, text: str) -> list[float]:
-        result = self.client.models.embed_content(
+        result = genai.embed_content(
             model=self._embed_model,
-            contents=text,
-            config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
+            content=text,
+            task_type="retrieval_query",
         )
-        return result.embeddings[0].values
+        return result["embedding"]
 
     def _is_diagram_vision(self, image_bytes: bytes) -> bool:
+        import PIL.Image, io
         prompt = (
             "Look at this image extracted from a water/wastewater treatment PDF. "
             "Classify it as ONE of:\n"
@@ -159,16 +156,13 @@ class RagEngine:
             "scanned text-only page, header/footer graphic, or border element\n\n"
             "Respond with ONLY one word: DIAGRAM or JUNK"
         )
-        response = self.client.models.generate_content(
-            model="gemini-3.5-flash-lite",
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
-                prompt,
-            ],
-        )
+        img = PIL.Image.open(io.BytesIO(image_bytes))
+        vision_model = genai.GenerativeModel(self._gen_model_name)
+        response = vision_model.generate_content([prompt, img])
         return "DIAGRAM" in response.text.strip().upper()
 
     def _describe_image(self, image_bytes: bytes, mime_type: str, context: str) -> str:
+        import PIL.Image, io
         prompt = (
             "Describe this technical diagram/figure from a water or wastewater treatment document. "
             "Include: what type of diagram it is (process flow, P&ID, schematic, cross-section, graph, table, etc.), "
@@ -178,14 +172,9 @@ class RagEngine:
         )
         if context:
             prompt += f"\n\nThis image is from: {context}"
-
-        response = self.client.models.generate_content(
-            model="gemini-3.5-flash-lite",
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                prompt,
-            ],
-        )
+        img = PIL.Image.open(io.BytesIO(image_bytes))
+        vision_model = genai.GenerativeModel(self._gen_model_name)
+        response = vision_model.generate_content([prompt, img])
         return response.text
 
     def ingest(
@@ -466,12 +455,12 @@ class RagEngine:
             "Use technical water/wastewater treatment terminology appropriately."
         )
 
-        response = self.client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=f"Context from documents:\n\n{context}\n\n---\n\nQuestion: {question}",
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-            ),
+        model = genai.GenerativeModel(
+            self._gen_model_name,
+            system_instruction=system_prompt,
+        )
+        response = model.generate_content(
+            f"Context from documents:\n\n{context}\n\n---\n\nQuestion: {question}",
         )
 
         return {
